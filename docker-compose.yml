@@ -1,0 +1,14 @@
+version: '3'
+services:
+  server-performance-monitor:
+    build: .
+    network_mode: "host"
+    volumes: #将该目录挂载到容器中
+      - .:/app
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            capabilities: [gpu]
+    command: ["python3", "/app/app.py"]

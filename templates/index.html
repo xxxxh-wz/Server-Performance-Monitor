@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>System Resources</title> 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+        }
+        .chart-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        .gpu-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .gpu-details {
+            margin-left: 20px;
+        }
+        .chart-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        canvas {
+            margin-bottom: 10px;
+        }
+        #cpuUsageDetails {
+            height: 130px; /* 设置固定高度 */
+            width: 100%; /* 可选：设置固定宽度，或者使用百分比/具体像素值 */
+            overflow: auto; /* 当内容超出设定的高度时，会出现滚动条 */
+            /* overflow: hidden; /* 超出部分隐藏，如果你不想内容滚动显示 */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>System Resources</h1>
+    <div class="chart-container">
+        <div class="chart-box">
+            <canvas id="cpuChart"></canvas>  <!--用于在JavaScript代码中引用它-->
+            <span>CPU Usage</span>             <!--图表标题-->
+            <span id="cpuUsageDetails"></span> <!-- Placeholder for CPU core usage details -->
+        </div>
+        <div class="chart-box">
+            <canvas id="memoryChart"></canvas>   <!--用于在JavaScript代码中引用它-->
+            <span>Memory Usage</span>            <!--图表标题-->
+            <span id="memoryUsageDetails"></span> <!-- Placeholder for memory usage details -->
+        </div>
+        <div class="chart-box">
+            <canvas id="networkChart"></canvas>   <!--用于在JavaScript代码中引用它-->
+            <span>Network Speed</span>           <!--图表标题-->
+            <span id="networkSpeedDetails"></span> <!-- Placeholder for network speed details -->
+        </div>
+    </div>
+    <div id="gpuCharts"></div>
+
+    <script>
+        //const 用于声明一个只读的常量（对象）
+        //可以使用 cpuCtx 来绘制一个表示CPU使用率的条形图或者线形图。
+        const cpuCtx = document.getElementById('cpuChart').getContext('2d'); //document.getElementById('cpuChart')返回HTML文档中ID为 'cpuChart' 的元素；getContext('2d') 是 <canvas> 元素的一个方法，它返回一个用于在 <canvas> 上绘制2D图形的对象
+        const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+        const gpuChartsContainer = document.getElementById('gpuCharts');
+        //初始化网络速率的条形图
+        const networkCtx = document.getElementById('networkChart').getContext('2d');
+        
+        const chartOptions = {
+            responsive: false,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                }
+            },
+            radius: '90%',
+            cutout: '70%',
+        };
+
+        //Chart是创建新图表的语句
+            //cpuCtx 是一个2D渲染上下文，其他的均是配置项
+        const cpuChart = new Chart(cpuCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Used', 'Free'],
+                datasets: [{
+                    label: 'CPU Usage',
+                    data: [0, 100],
+                    backgroundColor: ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)'],
+                }]
+            },
+            options: chartOptions
+        });
+
+        const memoryChart = new Chart(memoryCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Used', 'Free'],
+                datasets: [{
+                    label: 'Memory Usage',
+                    data: [0, 100],
+                    backgroundColor: ['rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)'],
+                }]
+            },
+            options: chartOptions
+        });
+
+
+        const networkChart = new Chart(networkCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Upload', 'Download'],
+                datasets: [{
+                    label: 'Network Speed (MB/s)',
+                    data: [0, 0], // 初始化数据为 0
+                    backgroundColor: [
+                        'rgba(153, 102, 255, 0.7)', // Upload
+                        'rgba(255, 159, 64, 0.7)' // Download
+                    ],
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Speed in MB/s'
+                        }
+                    }
+                },
+                responsive: false,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false, // 这将隐藏图例
+                    },
+                    title: {
+                        display: true,
+                        text: 'Network Speed (MB/s)'
+                    }
+                }
+            }
+        });
+
+        function fetchData() {
+            fetch('/data')
+                .then(response => response.json())
+                .then(data => {
+                    const cpuCoreUsageText = `Core Usage: ${data.cpu_usage.map(u => `${u}%`).join(', ')}`;
+                    document.getElementById('cpuUsageDetails').innerText = cpuCoreUsageText;
+                    cpuChart.data.datasets[0].data = [data.cpu_usage.reduce((a, b) => a + b, 0) / data.cpu_usage.length, 100 - (data.cpu_usage.reduce((a, b) => a + b, 0) / data.cpu_usage.length)];
+                    cpuChart.update();
+
+                    const totalMemoryGB = (data.memory.total / (1024 ** 3)).toFixed(2);
+                    const usedMemoryGB = (data.memory.used / (1024 ** 3)).toFixed(2);
+                    const memoryUsageText = `Used: ${usedMemoryGB} GB, Total: ${totalMemoryGB} GB`;
+                    document.getElementById('memoryUsageDetails').innerText = memoryUsageText;
+                    memoryChart.data.datasets[0].data = [usedMemoryGB / totalMemoryGB * 100, 100 - (usedMemoryGB / totalMemoryGB * 100)];
+                    memoryChart.update();
+
+                    updateGpuCharts(data.gpu_infos);
+
+                    // 更新网络速率数据
+                    const uploadSpeedMBps = (data.upload_speed).toFixed(2); // 转换为 MB/s
+                    const downloadSpeedMBps = (data.download_speed).toFixed(2); // 转换为 MB/s
+                    console.log(`Updating network speeds: Upload = ${uploadSpeedMBps}, Download = ${downloadSpeedMBps}`);
+
+                    networkChart.data.datasets[0].data[0] = parseFloat(uploadSpeedMBps);
+                    networkChart.data.datasets[0].data[1] = parseFloat(downloadSpeedMBps);
+
+                    networkChart.update();
+                });
+        }
+
+        function updateGpuCharts(gpuInfos) {
+            gpuInfos.forEach((gpu, index) => {
+                let chartContainer = document.getElementById(`gpuChartContainer-${index}`);
+                const chartExists = chartContainer !== null;
+
+                if (!chartExists) {
+                    chartContainer = document.createElement('div');
+                    chartContainer.id = `gpuChartContainer-${index}`;
+                    chartContainer.className = 'gpu-info';
+
+                    const canvasContainer = document.createElement('div');
+                    canvasContainer.className = 'chart-box';
+                    const canvas = document.createElement('canvas');
+                    canvas.id = `gpuChart-${index}`;
+                    canvasContainer.appendChild(canvas);
+
+                    const detailsContainer = document.createElement('div');
+                    detailsContainer.className = 'gpu-details';
+                    detailsContainer.id = `gpuDetails-${index}`;
+
+                    chartContainer.appendChild(canvasContainer);
+                    chartContainer.appendChild(detailsContainer);
+                    gpuChartsContainer.appendChild(chartContainer);
+                }
+
+                document.getElementById(`gpuDetails-${index}`).innerHTML = `<strong>${gpu.name.replace(", total_memory=80.00GiB", '')}</strong><p>GPU Utilization: ${gpu.gpu_utilization}%</p><p>Memory Used: ${(gpu.memory_used / gpu.memory_total * 100).toFixed(2)}%</p><p>Memory Free: ${(gpu.memory_free / gpu.memory_total * 100).toFixed(2)}%</p><p>Memory Used: ${gpu.memory_used_gb.toFixed(2)} GB, Total: ${gpu.memory_total_gb.toFixed(2)} GB</p>`;
+
+                const ctx = document.getElementById(`gpuChart-${index}`).getContext('2d');
+
+                if (window[`gpuChartInstance-${index}`]) {
+                    window[`gpuChartInstance-${index}`].data.datasets[0].data = [gpu.memory_used / gpu.memory_total * 100, gpu.memory_free / gpu.memory_total * 100];
+                    window[`gpuChartInstance-${index}`].update();
+                } else {
+                    window[`gpuChartInstance-${index}`] = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Memory Used', 'Memory Free'],
+                            datasets: [{
+                                label: `${gpu.name} Details`,
+                                data: [ gpu.memory_used / gpu.memory_total * 100, gpu.memory_free / gpu.memory_total * 100],
+                                backgroundColor: [
+                                    
+                                    'rgba(255, 159, 64, 0.7)',
+                                    'rgba(255, 205, 86, 0.7)'
+                                ],
+                            }]
+                        },
+                        options: chartOptions
+                    });
+                }
+            });
+        }
+
+
+
+        fetchData();
+        setInterval(fetchData, 1000); // Fetch data every 0.5 second
+    </script>
+</body>
+</html>
