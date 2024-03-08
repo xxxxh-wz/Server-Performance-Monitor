@@ -1,5 +1,5 @@
 # 使用Anaconda的官方Docker镜像
-FROM --platform=linux/amd64 nvidia/cuda:11.3.1-devel-ubuntu20.04
+FROM --platform=linux/amd64 nvidia/cuda:11.3.1-base-ubuntu20.04
 
 
 # 设置工作目录
